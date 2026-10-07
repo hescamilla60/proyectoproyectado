@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BiciClean · Simulador de ahorro</title>
+<style>
+  :root{
+    --bg:#f4f8fb; --card:#fff; --text:#16222e; --muted:#5b6b7a;
+    --brand:#0a8f6a; --blue:#1e88e5; --amber:#f9a825; --green:#43a047;
+    --border:#dbe5ee; --track:#e7eef5;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0f1720; --card:#17222e; --text:#e8eff6; --muted:#9db0c2; --border:#2a3a4a; --track:#243242; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+  header{text-align:center;padding:2.5rem 1rem 1rem}
+  header h1{margin:0;font-size:clamp(1.8rem,5vw,2.6rem)}
+  header p{color:var(--muted);margin:.5rem auto 0;max-width:560px}
+  main{max-width:860px;margin:0 auto;padding:1rem;display:grid;gap:1.25rem}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem}
+  h2{margin-top:0}
+  label{display:block;font-weight:600;margin:1rem 0 .35rem}
+  input[type=number]{width:100%;padding:.7rem;font-size:1.1rem;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text)}
+  input[type=range]{width:100%;accent-color:var(--brand)}
+  .hint{font-size:.85rem;color:var(--muted)}
+  .results{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.8rem;margin-top:1.2rem}
+  .stat{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:1rem;text-align:center}
+  .stat b{display:block;font-size:1.7rem}
+  .stat span{font-size:.85rem;color:var(--muted)}
+  .stat.hl{border-color:var(--brand)} .stat.hl b{color:var(--brand)}
+  .bars{margin-top:1.2rem}
+  .bar-row{display:grid;grid-template-columns:110px 1fr 90px;gap:.6rem;align-items:center;margin:.4rem 0;font-size:.9rem}
+  .bar-track{background:var(--track);border-radius:8px;height:18px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:8px;transition:width .5s ease}
+  .timeline{display:flex;height:34px;border-radius:10px;overflow:hidden;background:var(--track);margin:1rem 0 .4rem}
+  .seg{position:relative;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;color:#000;overflow:hidden;opacity:.35;transition:opacity .3s}
+  .seg.on{opacity:1}
+  .seg .fill{position:absolute;inset:0 auto 0 0;width:0;background:rgba(0,0,0,.18)}
+  .seg span{position:relative;z-index:1;white-space:nowrap}
+  .clock{font-size:2.4rem;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+  .stage{text-align:center;color:var(--muted);min-height:1.6em}
+  .controls{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:1rem}
+  button{padding:.7rem 1.3rem;font-size:1rem;font-weight:600;border:0;border-radius:10px;background:var(--brand);color:#fff;cursor:pointer}
+  button.sec{background:var(--track);color:var(--text)}
+  button:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+  footer{text-align:center;color:var(--muted);font-size:.85rem;padding:1.5rem 1rem 2.5rem}
+  @media (max-width:520px){ .bar-row{grid-template-columns:80px 1fr 70px} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🚲💦 BiciClean</h1>
+  <p>Estación autónoma de autolavado ecológico para bicicletas. Calcula cuánta agua ahorras y mira el ciclo en acción.</p>
+</header>
+
+<main>
+
+  <!-- A) CALCULADORA -->
+  <section class="card" aria-labelledby="t-calc">
+    <h2 id="t-calc">🧮 Calculadora de ahorro de agua</h2>
+
+    <label for="lavados">¿Cuántas veces lavas tu bici al mes?</label>
+    <input type="number" id="lavados" min="0" max="60" step="1" value="4" inputmode="numeric">
+
+    <label for="manguera">Consumo de tu manguera por lavado: <b id="mangueraVal">35</b> L</label>
+    <input type="range" id="manguera" min="30" max="40" step="1" value="35">
+    <div class="hint">Rango medido: 30–40 L con manguera común. BiciClean usa 8 L por ciclo.</div>
+
+    <div class="results" aria-live="polite">
+      <div class="stat"><b id="rManguera">0</b><span>L/año con manguera</span></div>
+      <div class="stat"><b id="rBici">0</b><span>L/año con BiciClean</span></div>
+      <div class="stat hl"><b id="rAhorro">0</b><span>L ahorrados al año</span></div>
+      <div class="stat hl"><b id="rPct">0%</b><span>de ahorro</span></div>
+      <div class="stat"><b id="rBaldes">0</b><span>baldes de 10 L ahorrados</span></div>
+    </div>
+
+    <div class="bars" aria-hidden="true">
+      <div class="bar-row"><span>Manguera</span><div class="bar-track"><div class="bar-fill" id="bM" style="background:var(--blue)"></div></div><span id="bMt"></span></div>
+      <div class="bar-row"><span>BiciClean</span><div class="bar-track"><div class="bar-fill" id="bB" style="background:var(--brand)"></div></div><span id="bBt"></span></div>
+    </div>
+  </section>
+
+  <!-- B) VISUALIZADOR DE CICLO -->
+  <section class="card" aria-labelledby="t-ciclo">
+    <h2 id="t-ciclo">⏱️ Visualizador del ciclo de lavado</h2>
+
+    <div class="clock" id="clock">0:00 / 3:30</div>
+    <div class="stage" id="stage">Pulsa «Iniciar» para simular el ciclo.</div>
+
+    <div class="timeline" id="timeline" role="progressbar" aria-valuemin="0" aria-valuemax="210" aria-valuenow="0" aria-label="Progreso del ciclo"></div>
+    <div class="hint" style="text-align:center">Desengrasado 30 s → Enjuague 2 min → Secado y recirculación 1 min</div>
+
+    <div class="controls">
+      <button id="btnStart">▶ Iniciar</button>
+      <button id="btnReset" class="sec">↺ Reiniciar</button>
+      <button id="btnSpeed" class="sec" aria-pressed="false">Velocidad: ×1</button>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Proyecto BiciClean · Equipo HE y FB · Licencia MIT<br>
+  Valores de referencia: 8 L por ciclo (BiciClean) vs 30–40 L (manguera común).
+</footer>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ---------- A) CALCULADORA ---------- */
+  const L_BICICLEAN = 8;      // litros por ciclo
+  const BALDE = 10;           // litros por balde (equivalencia ilustrativa)
+
+  const $ = id => document.getElementById(id);
+  const fmt = n => Math.round(n).toLocaleString("es");
+
+  function calcular(){
+    let lavados = parseInt($("lavados").value, 10);
+    if (isNaN(lavados) || lavados < 0) lavados = 0;
+    lavados = Math.min(lavados, 60);
+
+    const lManguera = parseInt($("manguera").value, 10);
+    $("mangueraVal").textContent = lManguera;
+
+    const anualManguera = lavados * 12 * lManguera;
+    const anualBici     = lavados * 12 * L_BICICLEAN;
+    const ahorro        = anualManguera - anualBici;
+    const pct           = anualManguera > 0 ? (ahorro / anualManguera) * 100 : 0;
+
+    $("rManguera").textContent = fmt(anualManguera);
+    $("rBici").textContent     = fmt(anualBici);
+    $("rAhorro").textContent   = fmt(ahorro);
+    $("rPct").textContent      = Math.round(pct) + "%";
+    $("rBaldes").textContent   = fmt(ahorro / BALDE);
+
+    const max = Math.max(anualManguera, 1);
+    $("bM").style.width = (anualManguera / max * 100) + "%";
+    $("bB").style.width = (anualBici / max * 100) + "%";
+    $("bMt").textContent = fmt(anualManguera) + " L";
+    $("bBt").textContent = fmt(anualBici) + " L";
+  }
+
+  $("lavados").addEventListener("input", calcular);
+  $("manguera").addEventListener("input", calcular);
+  calcular();
+
+  /* ---------- B) VISUALIZADOR DEL CICLO ---------- */
+  const STAGES = [
+    { name: "Desengrasado",            secs: 30,  color: "#f9a825", desc: "🧴 Desengrasante biodegradable en la transmisión (baja presión + reposo)" },
+    { name: "Enjuague",                secs: 120, color: "#29b6f6", desc: "🚿 Asperjado suave en abanico sobre cuadro y ruedas, con cepillos" },
+    { name: "Secado y recirculación",  secs: 60,  color: "#66bb6a", desc: "💨 Secado mientras el agua se filtra y se recircula" }
+  ];
+  const TOTAL = STAGES.reduce((a, s) => a + s.secs, 0); // 210 s
+
+  const timeline = $("timeline");
+  const segs = STAGES.map(s => {
+    const el = document.createElement("div");
+    el.className = "seg";
+    el.style.flex = s.secs;
+    el.style.background = s.color;
+    el.innerHTML = '<div class="fill"></div><span>' + s.name + " · " +
+      (s.secs >= 60 ? (s.secs / 60) + " min" : s.secs + " s") + "</span>";
+    timeline.appendChild(el);
+    return el;
+  });
+
+  const mmss = t => {
+    t = Math.max(0, Math.floor(t));
+    return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0");
+  };
+
+  let elapsed = 0, running = false, speed = 1, last = 0, raf = 0;
+
+  function render(){
+    $("clock").textContent = mmss(elapsed) + " / " + mmss(TOTAL);
+    timeline.setAttribute("aria-valuenow", Math.floor(elapsed));
+
+    let acc = 0, activeIdx = -1;
+    STAGES.forEach((s, i) => {
+      const start = acc, end = acc + s.secs;
+      const p = Math.min(1, Math.max(0, (elapsed - start) / s.secs));
+      segs[i].querySelector(".fill").style.width = (p * 100) + "%";
+      const on = elapsed > 0 && elapsed >= start && (elapsed < end || (elapsed >= TOTAL && i === STAGES.length - 1));
+      segs[i].classList.toggle("on", on || elapsed >= end);
+      if (on) activeIdx = i;
+      acc = end;
+    });
+
+    if (elapsed >= TOTAL) $("stage").textContent = "✅ ¡Ciclo completo! Bici limpia, seca y lista.";
+    else if (activeIdx >= 0) $("stage").textContent = "Etapa " + (activeIdx + 1) + "/3: " + STAGES[activeIdx].desc;
+    else $("stage").textContent = "Pulsa «Iniciar» para simular el ciclo.";
+  }
+
+  function tick(now){
+    if (!running) return;
+    elapsed += ((now - last) / 1000) * speed;
+    last = now;
+    if (elapsed >= TOTAL){
+      elapsed = TOTAL; running = false;
+      $("btnStart").textContent = "▶ Repetir";
+      render(); return;
+    }
+    render();
+    raf = requestAnimationFrame(tick);
+  }
+
+  $("btnStart").addEventListener("click", () => {
+    if (running){                     // pausar
+      running = false;
+      cancelAnimationFrame(raf);
+      $("btnStart").textContent = "▶ Continuar";
+      return;
+    }
+    if (elapsed >= TOTAL) elapsed = 0; // repetir
+    running = true;
+    last = performance.now();
+    $("btnStart").textContent = "⏸ Pausar";
+    raf = requestAnimationFrame(tick);
+  });
+
+  $("btnReset").addEventListener("click", () => {
+    running = false; cancelAnimationFrame(raf);
+    elapsed = 0;
+    $("btnStart").textContent = "▶ Iniciar";
+    render();
+  });
+
+  $("btnSpeed").addEventListener("click", () => {
+    speed = speed === 1 ? 10 : 1;
+    $("btnSpeed").textContent = "Velocidad: ×" + speed;
+    $("btnSpeed").setAttribute("aria-pressed", String(speed !== 1));
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
